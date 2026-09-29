@@ -12,11 +12,13 @@ from urllib.request import Request, urlopen
 SOURCE_URL = "https://www.banki.ru/products/deposits/"
 
 
-class _ModuleOptions(HTMLParser):
+class ModuleParser(HTMLParser):
+    # Подготавливает список для найденных настроек модулей
     def __init__(self):
         super().__init__()
         self.options = []
 
+    # Собирает значения data-module-options из тегов div.
     def handle_starttag(self, tag, attrs):
         if tag == "div":
             for name, value in attrs:
@@ -24,9 +26,11 @@ class _ModuleOptions(HTMLParser):
                     self.options.append(value)
 
 
+# Находит в HTML исходные данные каталога вкладов
 def _initial_data(html: str) -> dict:
-    parser = _ModuleOptions()
+    parser = ModuleParser()
     parser.feed(html)
+
     for option in parser.options:
         try:
             data = json.loads(option)
@@ -37,6 +41,7 @@ def _initial_data(html: str) -> dict:
     raise ValueError("Не найдены данные блока «Все предложения»")
 
 
+# Загружает URL и возвращает текст ответа и итоговый адрес.
 def _get(url: str) -> tuple[str, str]:
     request = Request(url, headers={
         "User-Agent": "Mozilla/5.0",
@@ -48,14 +53,17 @@ def _get(url: str) -> tuple[str, str]:
         return text, response.geturl()
 
 
+# Строит URL API для указанной страницы каталога.
 def _page_url(data: dict, page: int) -> str:
     form = data["defaultFormData"]
     query = []
+
     for key, value in form.items():
         if isinstance(value, list):
             query.extend((f"{key}[]", item) for item in value)
         elif value is not None:
             query.append((key, value))
+
     query.extend(data["defaultSort"].items())
     query.extend((
         ("page", page),
@@ -64,10 +72,12 @@ def _page_url(data: dict, page: int) -> str:
         ("aff_sub2", "/products/deposits/"),
         ("is_main_page", 1),
     ))
+
     city = quote(form["city"], safe="")
     return urljoin(SOURCE_URL, f"api/group/{city}/") + "?" + urlencode(query)
 
 
+# Обрабатывает каждую плашку вклада и возвращает словарь с данными
 def _offer_row(offer: dict, collected_at: str) -> dict:
     effective = offer.get("efficient_rate")
     bonus = offer.get("action_percent") if offer.get("is_action_active") else None
@@ -95,8 +105,8 @@ def _offer_row(offer: dict, collected_at: str) -> dict:
     }
 
 
-def collect_deposit_rates() -> list[dict]:
-    """Fetch every bank group and its expanded offers; return rows without writing files."""
+# Точка входа: собирает все предложения вкладов и возвращает список словарей с данными
+def run_parser() -> list[dict]:
     html, _ = _get(SOURCE_URL)
     data = _initial_data(html)
     initial = data["defaultOffersResults"]
@@ -117,12 +127,14 @@ def collect_deposit_rates() -> list[dict]:
 
     bank_ids = [group["id"] for group in groups]
     offers = [offer for group in groups for offer in group["deposit_result_rows"]]
+
     if len(groups) != expected_banks or len(set(bank_ids)) != expected_banks:
         raise ValueError(f"Собрано {len(groups)} из {expected_banks} банков или найдены повторы")
     if len(offers) != expected_offers:
         raise ValueError(f"Собрано {len(offers)} из {expected_offers} предложений")
 
     collected_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
     return [
         _offer_row(offer, collected_at)
         for offer in offers
