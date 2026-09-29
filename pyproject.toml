@@ -1,0 +1,10 @@
+[project]
+name = "banki-ru-deposits-parser"
+version = "0.1.0"
+description = "Mechanical parser for Banki.ru deposit offers"
+requires-python = ">=3.12"
+dependencies = [
+    "ipykernel>=6,<8",
+    "jupyterlab>=4,<5",
+    "pandas>=2.2,<4",
+]
