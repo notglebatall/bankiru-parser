@@ -6,7 +6,7 @@
 
 Нужны Python 3.12+ и uv:
 
-    uv sync --locked
+    uv sync
     uv run jupyter lab run.ipynb
 
 Выполните ячейки [run.ipynb](run.ipynb): полный результат остаётся в переменной `rates`, а таблица показывает первые 25 строк. Файлы с результатами не создаются.
