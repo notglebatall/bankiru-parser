@@ -4,4 +4,5 @@ __pycache__/
 .ipynb_checkpoints/
 .DS_Store
 /bankiros_parser/
+bankiros_parser
 /uv.lock

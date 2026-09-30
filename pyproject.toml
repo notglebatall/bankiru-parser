@@ -1,10 +1,13 @@
 [project]
 name = "banki-ru-deposits-parser"
 version = "0.1.0"
-description = "Mechanical parser for Banki.ru deposit offers"
+description = "Mechanical parsers for Banki.ru and Bankiros deposit offers"
 requires-python = ">=3.12"
 dependencies = [
+    "beautifulsoup4>=4.12,<5",
     "ipykernel>=6,<8",
+    "ipywidgets>=8,<9",
     "jupyterlab>=4,<5",
     "pandas>=2.2,<4",
+    "tqdm>=4.67,<5",
 ]

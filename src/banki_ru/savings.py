@@ -9,7 +9,7 @@ from urllib.parse import quote, urlencode, urljoin
 from urllib.request import Request, urlopen
 
 
-SOURCE_URL = "https://www.banki.ru/products/deposits/"
+SOURCE_URL = "https://www.banki.ru/products/deposits/?type=14&special%5B%5D=14"
 
 
 class ModuleParser(HTMLParser):
@@ -26,7 +26,7 @@ class ModuleParser(HTMLParser):
                     self.options.append(value)
 
 
-# Находит в HTML исходные данные каталога вкладов
+# Находит в HTML исходные данные каталога накопительных счетов
 def _initial_data(html: str) -> dict:
     parser = ModuleParser()
     parser.feed(html)
@@ -38,7 +38,7 @@ def _initial_data(html: str) -> dict:
             continue
         if data.get("pageType") == "MAINPRODUCT_SEARCH" and "defaultOffersResults" in data:
             return data
-    raise ValueError("Не найдены данные блока «Все предложения»")
+    raise ValueError("Не найдены данные блока «Все предложения» накопительных счетов")
 
 
 # Загружает URL и возвращает текст ответа и итоговый адрес.
@@ -77,7 +77,7 @@ def _page_url(data: dict, page: int) -> str:
     return urljoin(SOURCE_URL, f"api/group/{city}/") + "?" + urlencode(query)
 
 
-# Обрабатывает каждую плашку вклада и возвращает словарь с данными
+# Обрабатывает каждую плашку накопительного счёта и возвращает словарь с данными
 def _offer_row(offer: dict, collected_at: str) -> dict:
     effective = offer.get("efficient_rate")
     bonus = offer.get("action_percent") if offer.get("is_action_active") else None
@@ -105,8 +105,8 @@ def _offer_row(offer: dict, collected_at: str) -> dict:
     }
 
 
-# Точка входа: собирает все предложения вкладов и возвращает список словарей с данными
-def run_parser() -> list[dict]:
+# Точка входа: собирает все накопительные счета и возвращает список словарей с данными
+def collect_savings() -> list[dict]:
     html, _ = _get(SOURCE_URL)
     data = _initial_data(html)
     initial = data["defaultOffersResults"]
@@ -114,7 +114,7 @@ def run_parser() -> list[dict]:
     expected_offers = int(initial["totalCount"])
     per_page = int(data["defaultFormData"]["per_page"])
     if not initial["results"] or min(expected_banks, expected_offers, per_page) < 1:
-        raise ValueError("В каталоге не найдены предложения вкладов")
+        raise ValueError("В каталоге не найдены накопительные счета")
 
     groups = list(initial["results"])
     for page in range(2, ceil(expected_banks / per_page) + 1):
@@ -132,11 +132,9 @@ def run_parser() -> list[dict]:
         raise ValueError(f"Собрано {len(groups)} из {expected_banks} банков или найдены повторы")
     if len(offers) != expected_offers:
         raise ValueError(f"Собрано {len(offers)} из {expected_offers} предложений")
+    if any(not offer.get("is_saving_account") for offer in offers):
+        raise ValueError("В выдаче накопительных счетов найдены вклады")
 
     collected_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-    return [
-        _offer_row(offer, collected_at)
-        for offer in offers
-        if not offer.get("is_saving_account")
-    ]
+    return [_offer_row(offer, collected_at) for offer in offers]
